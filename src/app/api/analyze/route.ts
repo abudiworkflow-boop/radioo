@@ -92,22 +92,49 @@ export async function POST(request: NextRequest) {
 
     if (!n8nRes.ok) {
       const text = await n8nRes.text().catch(() => "Workflow failed");
+      console.error("n8n error:", n8nRes.status, text);
       return NextResponse.json(
-        { error: `Analysis failed: ${text}` },
-        { status: n8nRes.status }
+        { error: `Analysis failed (${n8nRes.status}). Please try again with a valid radiology image.` },
+        { status: 502 }
       );
     }
 
-    const raw = await n8nRes.json();
-    // n8n returns array from Respond to Webhook — unwrap
-    const data = Array.isArray(raw) ? raw[0] : raw;
-    const normalized = normalizeResponse(data);
+    const text = await n8nRes.text();
+    if (!text || text.trim() === "") {
+      return NextResponse.json(
+        { error: "No response from analysis pipeline. Please try again." },
+        { status: 502 }
+      );
+    }
 
+    let raw;
+    try {
+      raw = JSON.parse(text);
+    } catch {
+      console.error("Invalid JSON from n8n:", text.slice(0, 500));
+      return NextResponse.json(
+        { error: "Invalid response from analysis pipeline." },
+        { status: 502 }
+      );
+    }
+
+    // n8n lastNode mode may return array or object
+    const data = Array.isArray(raw) ? raw[0] : raw;
+
+    // Check for n8n error responses
+    if (data?.message && !data?.report) {
+      return NextResponse.json(
+        { error: `Analysis error: ${data.message}` },
+        { status: 502 }
+      );
+    }
+
+    const normalized = normalizeResponse(data);
     return NextResponse.json(normalized);
   } catch (error) {
     console.error("Analysis API error:", error);
     return NextResponse.json(
-      { error: "Internal server error" },
+      { error: "Failed to connect to analysis service. Please try again." },
       { status: 500 }
     );
   }
