@@ -6,64 +6,152 @@ function normalizeResponse(raw: Record<string, unknown>): Record<string, unknown
   const data = raw as Record<string, unknown>;
   const report = (data.report || {}) as Record<string, unknown>;
 
-  // Normalize findings
-  const findings = Array.isArray(report.findings)
-    ? report.findings.map((f: Record<string, unknown>, i: number) => ({
-        id: f.id ?? i + 1,
-        observation: f.observation || f.finding || "",
-        anatomicalLocation: f.anatomicalLocation || f.location || "Not specified",
-        severity: String(f.severity || "incidental").toLowerCase(),
-        confidence: String(f.confidence || "moderate").toLowerCase(),
-        differentialDiagnosis: Array.isArray(f.differentialDiagnosis)
-          ? f.differentialDiagnosis
-          : [],
-        evidenceFromKnowledgeBase: f.evidenceFromKnowledgeBase || f.evidence || "",
-        pineconeSources: Array.isArray(f.pineconeSources) ? f.pineconeSources : [],
-      }))
-    : [];
-
-  // Normalize recommendations
-  const recommendations = Array.isArray(report.recommendations)
-    ? report.recommendations.map((r: Record<string, unknown>) => ({
-        action: r.action || "",
-        urgency: String(r.urgency || "routine").toLowerCase(),
-        guideline: r.guideline || r.rationale || r.reference || "",
-        fleischnerCategory: r.fleischnerCategory || undefined,
-      }))
-    : [];
-
-  // Normalize technical quality
-  const tq = (report.technicalQuality || {}) as Record<string, unknown>;
-  const overallRaw = String(tq.overall || "adequate").toLowerCase();
-  const overallMap: Record<string, string> = {
-    adequate: "adequate",
-    good: "adequate",
-    excellent: "adequate",
-    suboptimal: "suboptimal",
-    limited: "suboptimal",
-    poor: "poor",
+  // --- Technique ---
+  const rawTechnique = (report.technique || {}) as Record<string, unknown>;
+  const rawQuality = (rawTechnique.quality || {}) as Record<string, unknown>;
+  const technique = {
+    view: String(rawTechnique.view || "unknown"),
+    position: String(rawTechnique.position || "unknown"),
+    quality: {
+      rotation: String(rawQuality.rotation || "unknown"),
+      inspiration: String(rawQuality.inspiration || "unknown"),
+      exposure: String(rawQuality.exposure || "unknown"),
+    },
+    limitations: Array.isArray(rawTechnique.limitations)
+      ? rawTechnique.limitations.map(String)
+      : [],
   };
-  const overall = overallMap[overallRaw] || "suboptimal";
+
+  // --- Devices ---
+  const devices = Array.isArray(report.devices)
+    ? report.devices.map((d: Record<string, unknown>) => ({
+        type: String(d.type || "other"),
+        status: String(d.status || "uncertain"),
+        details: String(d.details || ""),
+        confidence: String(d.confidence || "moderate").toLowerCase(),
+        urgency: String(d.urgency || "INFORMATIONAL").toUpperCase(),
+      }))
+    : [];
+
+  // --- Findings (handle both old severity and new urgency format) ---
+  const findings = Array.isArray(report.findings)
+    ? report.findings.map((f: Record<string, unknown>) => {
+        const isOldFormat = "observation" in f && !("system" in f);
+
+        if (isOldFormat) {
+          const severityToUrgency: Record<string, string> = {
+            critical: "CRITICAL",
+            significant: "URGENT",
+            incidental: "INFORMATIONAL",
+          };
+          return {
+            system: "other",
+            finding: String(f.observation || ""),
+            location: String(
+              f.anatomicalLocation || f.location || "Not specified"
+            ),
+            description: String(f.evidenceFromKnowledgeBase || f.observation || ""),
+            differential: Array.isArray(f.differentialDiagnosis)
+              ? f.differentialDiagnosis.map(String)
+              : [],
+            confidence: String(f.confidence || "moderate").toLowerCase(),
+            urgency:
+              severityToUrgency[
+                String(f.severity || "").toLowerCase()
+              ] || "ROUTINE",
+          };
+        }
+
+        return {
+          system: String(f.system || "other"),
+          finding: String(f.finding || ""),
+          location: String(f.location || ""),
+          description: String(f.description || ""),
+          differential: Array.isArray(f.differential)
+            ? f.differential.map(String)
+            : [],
+          confidence: String(f.confidence || "moderate").toLowerCase(),
+          urgency: String(f.urgency || "ROUTINE").toUpperCase(),
+        };
+      })
+    : [];
+
+  // --- Impression (handle string or array) ---
+  let impression: { text: string; urgency: string }[];
+  if (Array.isArray(report.impression)) {
+    impression = report.impression.map((item: unknown) => {
+      if (typeof item === "string") {
+        return { text: item, urgency: "ROUTINE" };
+      }
+      const obj = item as Record<string, unknown>;
+      return {
+        text: String(obj.text || ""),
+        urgency: String(obj.urgency || "ROUTINE").toUpperCase(),
+      };
+    });
+  } else if (typeof report.impression === "string") {
+    const lines = (report.impression as string).split(/\n/).filter((l) => l.trim());
+    impression = lines.map((line) => ({
+      text: line.replace(/^\d+\.\s*/, "").trim(),
+      urgency: "ROUTINE",
+    }));
+  } else {
+    impression = [];
+  }
+
+  // --- Recommendations (handle old action/urgency/guideline and new priority/text/rationale) ---
+  const recommendations = Array.isArray(report.recommendations)
+    ? report.recommendations.map((r: Record<string, unknown>) => {
+        const isOldFormat = "action" in r && !("priority" in r);
+
+        if (isOldFormat) {
+          const urgencyToPriority: Record<string, string> = {
+            immediate: "IMMEDIATE",
+            urgent: "URGENT",
+            routine: "ROUTINE",
+          };
+          return {
+            priority:
+              urgencyToPriority[
+                String(r.urgency || "").toLowerCase()
+              ] || "ROUTINE",
+            text: String(r.action || ""),
+            rationale: String(r.guideline || r.rationale || ""),
+          };
+        }
+
+        return {
+          priority: String(r.priority || "ROUTINE").toUpperCase(),
+          text: String(r.text || ""),
+          rationale: String(r.rationale || ""),
+        };
+      })
+    : [];
+
+  // --- Safety (always force booleans to true) ---
+  const rawSafety = (report.safety || {}) as Record<string, unknown>;
+  const safety = {
+    not_a_diagnosis: true,
+    radiologist_review_required: true,
+    confidence_summary: String(
+      rawSafety.confidence_summary ||
+        "AI analysis complete. Radiologist review required."
+    ),
+  };
 
   return {
     success: true,
     report: {
-      header: report.header || {
-        exam: "Radiology Study",
-        date: new Date().toISOString().split("T")[0],
-        clinicalIndication: "Not provided",
-        technique: "Standard imaging",
-      },
+      technique,
+      devices,
       findings,
-      impression: report.impression || "Analysis complete.",
+      impression,
       recommendations,
-      technicalQuality: { overall, details: String(tq.details || "") },
-      patientSummary: report.patientSummary || "",
-      references: Array.isArray(report.references) ? report.references : [],
+      safety,
     },
     disclaimer:
       data.disclaimer ||
-      "This AI-assisted analysis is for educational and clinical decision support only. It does not constitute a definitive diagnosis.",
+      "This AI-generated analysis is for clinical decision support only. It does not constitute a medical diagnosis. All findings must be reviewed and confirmed by a qualified radiologist.",
   };
 }
 
@@ -94,7 +182,9 @@ export async function POST(request: NextRequest) {
       const text = await n8nRes.text().catch(() => "Workflow failed");
       console.error("n8n error:", n8nRes.status, text);
       return NextResponse.json(
-        { error: `Analysis failed (${n8nRes.status}). Please try again with a valid radiology image.` },
+        {
+          error: `Analysis failed (${n8nRes.status}). Please try again with a valid radiology image.`,
+        },
         { status: 502 }
       );
     }

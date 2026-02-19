@@ -1,49 +1,80 @@
-export interface Finding {
-  id: number;
-  observation: string;
-  anatomicalLocation: string;
-  severity: string;
-  confidence: string;
-  differentialDiagnosis: string[];
-  evidenceFromKnowledgeBase: string;
-  pineconeSources: string[];
+// === Urgency & Confidence Types ===
+export type Urgency = "CRITICAL" | "URGENT" | "ROUTINE" | "INFORMATIONAL";
+export type Confidence = "high" | "moderate" | "low";
+export type Priority = "IMMEDIATE" | "URGENT" | "ROUTINE";
+
+// === Technique ===
+export interface TechniqueQuality {
+  rotation: string;
+  inspiration: string;
+  exposure: string;
 }
 
-export interface Recommendation {
-  action: string;
-  urgency: string;
-  guideline: string;
-  fleischnerCategory?: string;
+export interface Technique {
+  view: string;
+  position: string;
+  quality: TechniqueQuality;
+  limitations: string[];
 }
 
-export interface TechnicalQuality {
-  overall: string;
+// === Devices ===
+export interface Device {
+  type: string;
+  status: string;
   details: string;
+  confidence: string;
+  urgency: string;
 }
 
-export interface ReportHeader {
-  exam: string;
-  date: string;
-  clinicalIndication: string;
-  technique: string;
+// === Findings ===
+export interface Finding {
+  system: string;
+  finding: string;
+  location: string;
+  description: string;
+  differential: string[];
+  confidence: string;
+  urgency: string;
 }
 
+// === Impression ===
+export interface ImpressionItem {
+  text: string;
+  urgency: string;
+}
+
+// === Recommendations ===
+export interface Recommendation {
+  priority: string;
+  text: string;
+  rationale: string;
+}
+
+// === Safety ===
+export interface Safety {
+  not_a_diagnosis: boolean;
+  radiologist_review_required: boolean;
+  confidence_summary: string;
+}
+
+// === Full Report ===
 export interface MedicalReport {
-  header: ReportHeader;
+  technique: Technique;
+  devices: Device[];
   findings: Finding[];
-  impression: string;
+  impression: ImpressionItem[];
   recommendations: Recommendation[];
-  technicalQuality: TechnicalQuality;
-  patientSummary: string;
-  references: string[];
+  safety: Safety;
 }
 
+// === API Response Envelope ===
 export interface AnalysisResponse {
   success: boolean;
   report: MedicalReport;
   disclaimer: string;
 }
 
+// === API Request (unchanged) ===
 export interface AnalysisRequest {
   imageBase64: string;
   imageName: string;
@@ -52,6 +83,7 @@ export interface AnalysisRequest {
   clinicalContext: string;
 }
 
+// === UI Constants ===
 export type Modality = "xray" | "ct" | "mri" | "ultrasound" | "mammography";
 export type BodyPart =
   | "chest"

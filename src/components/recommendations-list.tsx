@@ -2,10 +2,10 @@ import { ArrowRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { Recommendation } from "@/types";
 
-const urgencyConfig = {
-  immediate: { badge: "bg-red-100 text-red-800", label: "IMMEDIATE" },
-  urgent: { badge: "bg-amber-100 text-amber-800", label: "URGENT" },
-  routine: { badge: "bg-green-100 text-green-800", label: "ROUTINE" },
+const priorityConfig: Record<string, { badge: string; label: string }> = {
+  IMMEDIATE: { badge: "bg-red-100 text-red-800", label: "IMMEDIATE" },
+  URGENT: { badge: "bg-amber-100 text-amber-800", label: "URGENT" },
+  ROUTINE: { badge: "bg-green-100 text-green-800", label: "ROUTINE" },
 };
 
 export function RecommendationsList({
@@ -22,8 +22,9 @@ export function RecommendationsList({
       </h3>
       <div className="space-y-2">
         {recommendations.map((rec, i) => {
-          const urgKey = rec.urgency as keyof typeof urgencyConfig;
-          const config = urgencyConfig[urgKey] || urgencyConfig.routine;
+          const config =
+            priorityConfig[rec.priority?.toUpperCase()] ||
+            priorityConfig.ROUTINE;
           return (
             <div
               key={i}
@@ -41,10 +42,10 @@ export function RecommendationsList({
                     {config.label}
                   </span>
                 </div>
-                <p className="text-sm text-gray-900">{rec.action}</p>
-                {rec.guideline && (
+                <p className="text-sm text-gray-900">{rec.text}</p>
+                {rec.rationale && (
                   <p className="text-xs text-gray-500 mt-1 italic">
-                    {rec.guideline}
+                    {rec.rationale}
                   </p>
                 )}
               </div>
