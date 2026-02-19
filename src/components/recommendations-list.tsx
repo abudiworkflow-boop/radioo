@@ -22,8 +22,8 @@ export function RecommendationsList({
       </h3>
       <div className="space-y-2">
         {recommendations.map((rec, i) => {
-          const config =
-            urgencyConfig[rec.urgency] || urgencyConfig.routine;
+          const urgKey = rec.urgency as keyof typeof urgencyConfig;
+          const config = urgencyConfig[urgKey] || urgencyConfig.routine;
           return (
             <div
               key={i}

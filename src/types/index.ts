@@ -2,8 +2,8 @@ export interface Finding {
   id: number;
   observation: string;
   anatomicalLocation: string;
-  severity: "critical" | "significant" | "incidental";
-  confidence: "high" | "moderate" | "low";
+  severity: string;
+  confidence: string;
   differentialDiagnosis: string[];
   evidenceFromKnowledgeBase: string;
   pineconeSources: string[];
@@ -11,13 +11,13 @@ export interface Finding {
 
 export interface Recommendation {
   action: string;
-  urgency: "immediate" | "urgent" | "routine";
+  urgency: string;
   guideline: string;
   fleischnerCategory?: string;
 }
 
 export interface TechnicalQuality {
-  overall: "adequate" | "suboptimal" | "poor";
+  overall: string;
   details: string;
 }
 

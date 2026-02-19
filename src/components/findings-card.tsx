@@ -39,7 +39,8 @@ const confidenceColors = {
 
 export function FindingsCard({ finding }: { finding: Finding }) {
   const [expanded, setExpanded] = useState(false);
-  const config = severityConfig[finding.severity] || severityConfig.incidental;
+  const sevKey = finding.severity as keyof typeof severityConfig;
+  const config = severityConfig[sevKey] || severityConfig.incidental;
   const Icon = config.icon;
 
   return (
@@ -70,7 +71,7 @@ export function FindingsCard({ finding }: { finding: Finding }) {
             <span
               className={cn(
                 "text-xs font-medium",
-                confidenceColors[finding.confidence] || "text-gray-500"
+                confidenceColors[finding.confidence as keyof typeof confidenceColors] || "text-gray-500"
               )}
             >
               {finding.confidence} confidence
